@@ -1,0 +1,11 @@
+{
+  "name" : "lights-controller",
+  "description" : "application to control spark core connected lights",
+  "version" : "0.1.0",
+  "private" : "true",
+  "dependencies" : {
+    "express" : "3.x",
+    "express-hbs" : "0.7.11",
+    "spark" : "0.2.1"
+  }
+}
