@@ -1,211 +1,240 @@
 var express = require('express')
-  , hbs = require('express-hbs')
   , http = require('http')
   , app = express()
   , server = http.createServer(app)
   , spark = require('spark')
-  ;
+  , q = require('q')
+  , knownDevices = {}
+  ; 
 
-var knownDevices = {};
+server.listen(3000);
 
+// At the moment most commands just send a success or failure back to
+//   the client.
+// I want to expand it to have more of a UI.
+// However, that's work for another version.
+
+
+// Login to spark cloud
 spark.login({accessToken: '<insert your access token here>'}).then(
   function(token) {
     console.log('Login success');
   },
-  function(err) {
+  function(error) {
     console.log('Login failure');
   }
 );
-server.listen(3000);
 
-app.engine('hbs', hbs.express3({
-  partialsDir : __dirname + '/views/partials',
-  contentHelperName : 'content',
-}));
+app.get('/', function(req, res) {
+  res.send('home');
+});
 
-app.set('view engine', 'hbs');
-app.set('views', __dirname + '/views');
-app.use(express.static(__dirname + '/static'));
+app.get('/:device', function(req, res) {
+  var device = req.params.device;
+  if(device != 'favicon.ico') {
+    isKnownDevice(device)
+      .then(function(result) {
+          console.log('Final result',result);
+          res.send('Command Success');
+        },function(result) {
+          console.log('Final result',result);
+          res.send('Command Failure');
+      })
+      .catch(function(error) {
+        console.log('Caught error:',error);
+        res.send('Unhandled error:',error);
+      });
+  } else {
+    console.log('Ignoring device:', device);
+  }
+});
 
-function refreshDevices() {
-  var devicesPr = spark.listDevices();
-  devicesPr.then(
+app.get('/:device/off', function(req, res) {
+var device = req.params.device;
+  if(device != 'favicon.ico') {
+    isKnownDevice(device)
+      .then(getDeviceRole)
+      .then(function(role) {
+        return verifyRole(role, 'lights');
+      }).then(function() {
+        return sendCommand(device, 'setRoutine',0);
+      }).then(function(result) {
+          console.log('Final result',result);
+          res.send('Command Success');
+        },function(result) {
+          console.log('Final result',result);
+          res.send('Command Failure');
+      })  
+      .catch(function(error) {
+        console.log('Caught error:',error);
+        res.send('Unhandled error:',error);
+      }); 
+  } else {
+    console.log('Ignoring device:', device);
+  }
+});
+
+app.get('/:device/r/:routine', function(req, res) {
+  var device = req.params.device;
+  var routine = req.params.routine;
+  if(device != 'favicon.ico') {
+    isKnownDevice(device)
+      .then(getDeviceRole)
+      .then(function(role) {
+        return verifyRole(role, 'lights');
+      }).then(function() {
+        return sendCommand(device, 'setRoutine',routine);
+      }).then(function(result) {
+          console.log('Final result',result);
+          res.send('Command Success');
+        },function(result) {
+          console.log('Final result',result);
+          res.send('Command Failure');
+      })  
+      .catch(function(error) {
+        console.log('Caught error:',error);
+        res.send('Unhandled error:',error);
+      }); 
+  } else {
+    console.log('Ignoring device:', device);
+  }
+});
+
+app.get('/:device/c/:r/:g/:b',function(req, res) {
+  var device = req.params.device;
+  // I should add some verification of nubmers here.
+  var rgbColor = req.params.r + ':' + req.params.g + ':' + req.params.b;
+  // I really don't know why this request is coming through.
+  // I'm just excluding it for now.
+  if(device != 'favicon.ico') {
+    isKnownDevice(device)
+      .then(getDeviceRole)
+      .then(function(role) {
+        return verifyRole(role, 'lights');
+      }).then(function() {
+        return sendCommand(device, 'setColor',rgbColor);
+      }).then(function(result) {
+          console.log('Final result',result);
+          res.send('Command Success');
+        },function(result) {
+          console.log('Final result',result);
+          res.send('Command Failure');
+      })  
+      .catch(function(error) {
+        console.log('Caught error:',error);
+        res.send('Unhandled error:',error);
+      }); 
+  } else {
+    console.log('Ignoring device:', device);
+  }
+});
+
+
+// Define helper functions
+
+/**
+ *  getDevices
+ *  This method gets a list of known devices from the Spark Cloud
+ *    and caches their information so that we don't have to keep
+ *    going back out and getting it.
+ *  Only devices that are 'online' are saved
+ */
+function getDevices() {
+  spark.listDevices().then(
     function(devices) {
       devices.forEach(function(device) {
-        knownDevices[device.attributes.name] = device;
-        console.log("Found connected device: " + device.attributes.name);
+        if(device.connected) {
+          knownDevices[device.name] = device;
+          console.log('found connected device:', device.name);
+        }
       });
     },
-    function(err) {
-      console.log('Device list call failed');
+    function(result) {
+      console.log('getDevices: failure:', result);
     }
   );
 }
 
-refreshDevices();
-setInterval(refreshDevices,100000);
-
-app.get('/', function(req,res) {
-  var links = "";
-  var keys = Object.keys(knownDevices);
-  keys.forEach(function(key) {
-    links += "<a href=\""+ key + "\">"+key+"</a></ br>";
-  });
-  res.send(links);
-});
-
-app.get('/:device', function(req,res) {
-  var device = req.params.device;
-  if(knownDevices[device]) {
-  var curDev = knownDevices[device];
-  }
-  res.send('hi');
-});
-
-app.get('/:device/setColors/:r/:g/:b', function(req,res) {
-  var rgbString = req.params.r + ":" + req.params.g + ":" + req.params.b;
-  var device = req.params.device;
-  if(knownDevices[device]) {
-    var curDev = knownDevices[device];
-    curDev.getVariable('role', function(err, data) {
-      if(data.result == "lights") {
-        if(knownDevices[device]) {
-          var curDev = knownDevices[device];
-          curDev.callFunction('setColors',rgbString, function(err, data) {
-            if(err) {
-              console.log('An error occurred', err);
-            } else {
-              console.log('Command successful', data);
-              res.send('Success');
-            }
-          });
-        } else {
-          console.log('Unknown endpoint');
-          res.send('Unknown endpoint');
-        }
-      } else {
-        console.log('End point not of appropriate type');
-        res.send('Endpoint not of appropriate type');
-      }
-    });
-  }
-});
-
-/*
-app.get('/:device/setRoutine/:routine', function(req,res) {
-  var device  = req.params.device;
-  var routine = req.params.routine;
-  // Is it a known device ?
-  if(isKnownDevice(device)) {
-    var curDevice = knownDevices[device];
-    curDev.getVariable('role', function(err, data) {
-      // if this method is appropriate for the endpoint
-      if(data.result == "lights") {
-        curDev.callFunction("setRoutine", routine, function(err, data) {
-          err ? res.send("An error occurred", err) :
-                res.send("Command successful", data);
-        });
-      } else {
-        console.log("Endpoint is not of appropriate type");
-        res.send("Endpoint is not of appropriate type");
-      }
-    });
-});
-*/
-
-app.get('/:device/setRoutine/:routine', function(req, res) {
-  var device  = req.params.device;
-  var routine = req.params.routine;
-  if(isKnownDevice(device)) {
-    var curDevice = knownDevices[device];
-    var role = getDeviceRole(device);
-    if(verifyRole(role, "lights")) {
-      var result = sendCommand(device, "setRoutine", routine);
-      console.log(result);
-      res.send(result);
-    } else {
-      console.log("Endpoint is not of appropriate type");
-      res.send("Endpoint is not of appropriate type");
-    }
+/**
+ * isKnownDevice
+ * This method takes a device name, like one passed in from the URL
+ *   and checks to see if we have it in the knownDevices list
+ * If it is known, then we can call functions on it. 
+ */
+function isKnownDevice(deviceName) {
+  var deferred = q.defer();  
+  if(knownDevices[deviceName]) {
+    console.log('I know about this device');
+    deferred.resolve(deviceName);
   } else {
-    console.log("Not a valid endpoint");
-    res.send("Not a valid endpoint");
+    console.log('I don\'t know about this device');
+    deferred.reject('Unknown device');
   }
-});
-
-app.get('/:device/off', function(req,res) {
-  var device = req.params.device;
-  if(knownDevices[device]) {
-    var curDev = knownDevices[device];
-    curDev.getVariable('role', function(err, data) {
-      if(data.result == "lights") {
-        curDev.callFunction('setRoutine','1', function(err, data) {
-          if(err) {
-            console.log('An error occurred', err);
-          } else {
-            console.log('command Successful', data);
-            res.send('Success');
-          }
-        });
-      } else {
-        console.log('Endpoint not of appropriate type');
-        res.send('Endpoint not of appropriate type');
-      }
-    });
-  }
-});
-
-
-function isKnownDevice(device) {
-  if(knownDevices[device]) {
-    return true;
-  } else {
-    return false;
-  }
+  return deferred.promise;
 }
 
-function verifyRole(device, role) {
-  console.log(device);
-  return true;
-}
-
-function getDeviceRole(device) {
-  knownDevices[device].getVariable('role', function(err, data) {
+/**
+ * getDeviceRole
+ * This function retrieves the role that the spark thinks it is.
+ * At the moment, this is set in firmware, and can't be changed
+ *   at runtime. I don't see a need to be able to.
+ */
+function getDeviceRole(deviceName) {
+  var deferred = q.defer();
+  knownDevices[deviceName].getVariable('role', function(err, data) {
     if(err) {
-      return err
+      console.log('Error getting role', err);
+      deferred.reject('Error getting role');
     } else {
-      return data;
+      console.log('Success getting role');
+      deferred.resolve(data.result);
     }
   });
+  return deferred.promise;
 }
 
-function sendCommand(device, command, args) {
-  knownDevices[device].callFunction(command, args, function(err, data) {
+/**
+ * verifyRole
+ * This function just compares the role you got back from getDeviceRole
+ *   against (at the moment) a role provided
+ * I plan to expand this function so that 'role' is an array. i.e. one
+ *   server method can be accepted by multiple 'classes' of core.
+ */
+
+function verifyRole(deviceRole, role) {
+  var deferred = q.defer();
+  if(deviceRole == role) {
+    console.log('Role verified');
+    deferred.resolve('true');
+  } else { 
+    console.log('Role not verified');
+    deferred.reject('false');
+  }
+  return deferred.promise;
+}
+
+/**
+ * sendCommand
+ * This function does the hard work of actually sending the command to
+ *   the core.
+ */
+function sendCommand(deviceName, command, args) {
+  var deferred = q.defer();
+  knownDevices[deviceName].callFunction(command, args, function(err, data) {
     if(err) {
-      return err;
+      console.log('Command failure');
+      deferred.reject('Command failure');
     } else {
-       return data;
+      console.log('Command success');
+      deferred.resolve('Command success');
     }
   });
+  return deferred.promise;
 }
-/*
-app.get('/setColors/:r/:g/:b', function(req,res) {
-  var rgbString = req.params.r + ":" + req.params.g + ":" + req.params.b;
-  var devicesPr = spark.listDevices();
-  devicesPr.then(
-    function(devices) {
-      devices[0].callFunction('setColors',rgbString, function(err, data) {
-        if(err) {
-          console.log('an error occurred:', err);
-        } else {
-          console.log('function successful: ', data);
-        }
-      });
-    },
-    function(err) {
-      console.log('list devices call failed: ', err);
-    }
-  );
-  res.send('foo');
-});
-*/
+
+// Do the initial retrival of devices and set a refresh every 100 seconds
+// This could probably be longer, you're not gonna be adding and removing
+//   devices all the time but they might come and go as far as
+//   connectedness goes
+getDevices();
+setInterval(getDevices,100000);
