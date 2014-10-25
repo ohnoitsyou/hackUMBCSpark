@@ -4,6 +4,7 @@ var express = require('express')
   , server = http.createServer(app)
   , spark = require('spark')
   , q = require('q')
+  , config = require('config')
   , knownDevices = {}
   ; 
 
@@ -16,7 +17,7 @@ server.listen(3000);
 
 
 // Login to spark cloud
-spark.login({accessToken: '<insert your access token here>'}).then(
+spark.login({accessToken: config.get('accessToken')}).then(
   function(token) {
     console.log('Login success');
   },

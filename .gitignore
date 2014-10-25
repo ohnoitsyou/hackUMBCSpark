@@ -5,6 +5,9 @@
 # Installed modules
 node_modules
 
+# Your configuration w/ access token
+Server/config/default.json
+
 # =========================
 # Vi/m
 # =========================
