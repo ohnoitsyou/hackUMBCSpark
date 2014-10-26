@@ -27,6 +27,8 @@ char *role = "lights";
 char *routines[4] = {"off", "random", "fade", "static"};
 int routine = 0;
 
+bool silent;
+
 void setColor(Color color) {
     analogWrite(redPin,color.getR());
     analogWrite(grnPin,color.getG());
@@ -64,10 +66,18 @@ int setRoutine(String args) {
     return routine;
 }
 
+int toggleSilent(String args) {
+    silent = silent ? false : true;
+    EEPROM.write(2,silent);
+    return (int) silent;
+}
+
 void setup() {
     routine = (int) EEPROM.read(1);
+    silent = (int) EEPROM.read(2);
     Spark.function("setColor", colorFromWeb);
     Spark.function("setRoutine", setRoutine);
+    Spark.function("toggleSilent", toggleSilent);
     
     Spark.variable("role", role, STRING);
     int r = lastColor.getR();
@@ -84,6 +94,12 @@ void setup() {
 }
 
 void loop() {
+    if(silent && WiFi.ready()) {
+        RGB.control(true);
+        RGB.color(0,0,0);
+    } else if(!silent || !WiFi.ready()) {
+        RGB.control(false);
+    }
   switch(routine) {
       case 0:
         // the current LED i'm using has 255 as off
