@@ -51,7 +51,7 @@ app.get('/:device', function(req, res) {
 });
 
 app.get('/:device/off', function(req, res) {
-var device = req.params.device;
+  var device = req.params.device;
   if(device != 'favicon.ico') {
     isKnownDevice(device)
       .then(getDeviceRole)
@@ -59,6 +59,31 @@ var device = req.params.device;
         return verifyRole(role, 'lights');
       }).then(function() {
         return sendCommand(device, 'setRoutine',0);
+      }).then(function(result) {
+          console.log('Final result',result);
+          res.send('Command Success');
+        },function(result) {
+          console.log('Final result',result);
+          res.send('Command Failure');
+      })  
+      .catch(function(error) {
+        console.log('Caught error:',error);
+        res.send('Unhandled error:',error);
+      }); 
+  } else {
+    console.log('Ignoring device:', device);
+  }
+});
+
+app.get('/:device/silent', function(req, res) {
+ var device = req.params.device;
+  if(device != 'favicon.ico') {
+    isKnownDevice(device)
+      .then(getDeviceRole)
+      .then(function(role) {
+        return verifyRole(role, 'lights');
+      }).then(function() {
+        return sendCommand(device, 'toggleSilent',0);
       }).then(function(result) {
           console.log('Final result',result);
           res.send('Command Success');
