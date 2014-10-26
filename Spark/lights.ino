@@ -65,7 +65,7 @@ int setRoutine(String args) {
 }
 
 void setup() {
-    //routine = (int) EEPROM.read(1);
+    routine = (int) EEPROM.read(1);
     Spark.function("setColor", colorFromWeb);
     Spark.function("setRoutine", setRoutine);
     
