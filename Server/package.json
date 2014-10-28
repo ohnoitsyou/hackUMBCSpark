@@ -4,7 +4,7 @@
   "version" : "0.1.0",
   "private" : "true",
   "dependencies" : {
-    "express" : "3.x",
+    "express" : "4.x",
     "q": "1.0",
     "spark" : "0.2.1",
     "config" : "1.6.0"
