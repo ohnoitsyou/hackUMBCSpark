@@ -2,6 +2,7 @@
 
 #include "application.h"
 #include "Color.h"
+#include "Fader.h"
 
 // Default color defn's
 Color red     (255, 000, 000);
@@ -13,6 +14,8 @@ Color magenta (255, 000, 255);
 Color orange  (000, 190, 255);
 Color white   (255, 255, 255);
 Color black   (000, 000, 000);
+
+Color colorsArray[7] = {red, yellow, green, cyan, blue, magenta,red};
 
 Color lastColor(0,0,0);
 
@@ -26,6 +29,8 @@ int cycleSpeed = 500;
 char *role = "lights";
 char *routines[4] = {"off", "random", "fade", "static"};
 int routine = 0;
+
+bool silent;
 
 void setColor(Color color) {
     analogWrite(redPin,color.getR());
@@ -41,7 +46,7 @@ int colorFromWeb(String args) {
     // find the seperators
     int redSep = args.indexOf(':');
     int grnSep = args.indexOf(':', redSep + 1);
-    
+
     unsigned int redValue = args.substring(0,redSep).toInt();
     unsigned int grnValue = args.substring(redSep + 1, grnSep).toInt();
     unsigned int bluValue = args.substring(grnSep + 1).toInt();
@@ -64,11 +69,19 @@ int setRoutine(String args) {
     return routine;
 }
 
+int toggleSilent(String args) {
+    silent = silent ? false : true;
+    EEPROM.write(2,silent);
+    return (int) silent;
+}
+
 void setup() {
     routine = (int) EEPROM.read(1);
+    silent = (int) EEPROM.read(2);
     Spark.function("setColor", colorFromWeb);
     Spark.function("setRoutine", setRoutine);
-    
+    Spark.function("toggleSilent", toggleSilent);
+
     Spark.variable("role", role, STRING);
     int r = lastColor.getR();
     int g = lastColor.getG();
@@ -76,7 +89,7 @@ void setup() {
     Spark.variable("redValue", &r, INT);
     Spark.variable("grnValue", &g, INT);
     Spark.variable("bluValue", &b, INT);
-  
+
     for(int i; i < 3; i++) {
         pinMode(colorPins[i], OUTPUT);
         analogWrite(colorPins[i], 255);
@@ -84,9 +97,15 @@ void setup() {
 }
 
 void loop() {
+    if(silent && WiFi.ready()) {
+        RGB.control(true);
+        RGB.color(0,0,0);
+    } else if(!silent || !WiFi.ready()) {
+        RGB.control(false);
+    }
   switch(routine) {
       case 0:
-        // the current LED i'm using has 255 as off
+        // the current LED i'm using has 000 as off
         setColor(black);
         break;
       case 1:
@@ -94,6 +113,16 @@ void loop() {
         delay(cycleSpeed);
         break;
       case 2:
+        for(int i = 0; i < 7 - 1 ; i++) {
+            Fader fader = Fader(colorsArray[i], colorsArray[i+1]);
+            for(int i = 0; i < 256; i++) {
+                setColor(fader.getStep(i));
+                delay(10);
+            }
+            // I really want this to be a s non-blocking as possible,
+            // so check if a new command has come in while we were fading
+            if(routine != 2) { break; }
+        }
         break;
       case 3:
         setColor(lastColor);
