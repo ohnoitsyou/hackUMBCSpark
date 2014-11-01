@@ -133,7 +133,34 @@ app.get('/:device/cs/:speed', function(req, res) {
         return verifyRole(role, 'lights');
       }).then(function() {
         console.log(speed);
-        return sendCommand(device, 'notacommand',speed);
+        return sendCommand(device, 'setCS',speed);
+      }).then(function(result) {
+          console.log('Final result',result);
+          res.send('Command Success');
+        },function(result) {
+          console.log('Final result',result);
+          res.send('Command Failure');
+      })  
+      .catch(function(error) {
+        console.log('Caught error:',error);
+        res.send('Unhandled error:',error);
+      }); 
+  } else {
+    console.log('Ignoring device:', device);
+  }
+});
+
+app.get('/:device/ss/:speed', function(req, res) {
+  device = req.params.device;
+  speed = req.params.speed;
+  if(device != 'favicon.ico') {
+    isKnownDevice(device)
+      .then(getDeviceRole)
+      .then(function(role) {
+        return verifyRole(role, 'lights');
+      }).then(function() {
+        console.log(speed);
+        return sendCommand(device, 'setSSpeed',speed);
       }).then(function(result) {
           console.log('Final result',result);
           res.send('Command Success');
