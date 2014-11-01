@@ -1,0 +1,17 @@
+<htm>
+<head>
+  <title>Device</title>
+</head>
+<body>
+  <h2>Device Status</h2>
+  <hr>
+  <h3>{{device-name}}</h3>
+  {{#if success }}
+  <div>ID: {{device.id}}</div>
+  <div>Name: {{device.name}}</div>
+  <div>Last Heard: {{device.lastHeard}}</div>
+  {{else}}
+  <div>You have requested a device that is either offline or I don't know about</div>
+  {{/if}}
+</body>
+</html>

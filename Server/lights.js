@@ -5,6 +5,7 @@ var express = require('express')
   , spark = require('spark')
   , q = require('q')
   , config = require('config')
+  , hbs = require('hbs')
   , knownDevices = {}
   ; 
 
@@ -15,19 +16,11 @@ server.listen(3000);
 // I want to expand it to have more of a UI.
 // However, that's work for another version.
 
-
-// Login to spark cloud
-spark.login({accessToken: config.get('accessToken')}).then(
-  function(token) {
-    console.log('Login success');
-  },
-  function(error) {
-    console.log('Login failure');
-  }
-);
+app.set('view engine', 'hbs');
+hbs.registerPartials(__dirname + '/views/partials');
 
 app.get('/', function(req, res) {
-  res.send('home');
+  res.render('index',{'devices' : knownDevices});
 });
 
 app.get('/:device', function(req, res) {
@@ -36,10 +29,14 @@ app.get('/:device', function(req, res) {
     isKnownDevice(device)
       .then(function(result) {
           console.log('Final result',result);
-          res.send('Command Success');
+          //res.send('Command Success');
+          res.render('device',{'success': true, 
+                               'device-name': device,
+                               'device': knownDevices[device]});
         },function(result) {
           console.log('Final result',result);
-          res.send('Command Failure');
+          //res.send('Command Failure');
+          res.render('device',{'success': false});
       })
       .catch(function(error) {
         console.log('Caught error:',error);
@@ -126,6 +123,34 @@ app.get('/:device/r/:routine', function(req, res) {
   }
 });
 
+app.get('/:device/cs/:speed', function(req, res) {
+  var device = req.params.device;
+  var speed = req.params.speed;
+  if(device != 'favicon.ico') {
+    isKnownDevice(device)
+      .then(getDeviceRole)
+      .then(function(role) {
+        return verifyRole(role, 'lights');
+      }).then(function() {
+        console.log(speed);
+        return sendCommand(device, 'notacommand',speed);
+      }).then(function(result) {
+          console.log('Final result',result);
+          res.send('Command Success');
+        },function(result) {
+          console.log('Final result',result);
+          res.send('Command Failure');
+      })  
+      .catch(function(error) {
+        console.log('Caught error:',error);
+        res.send('Unhandled error:',error);
+      }); 
+  } else {
+    console.log('Ignoring device:', device);
+  }
+});
+
+
 app.get('/:device/c/:r/:g/:b',function(req, res) {
   var device = req.params.device;
   // I should add some verification of nubmers here.
@@ -207,15 +232,16 @@ function isKnownDevice(deviceName) {
  */
 function getDeviceRole(deviceName) {
   var deferred = q.defer();
-  knownDevices[deviceName].getVariable('role', function(err, data) {
-    if(err) {
-      console.log('Error getting role', err);
-      deferred.reject('Error getting role');
-    } else {
+  getVariable(deviceName, 'role').then(
+    function(role) {
       console.log('Success getting role');
-      deferred.resolve(data.result);
+      deferred.resolve(role);
+    },
+    function(error) {
+      console.log('Error getting role');
+      deferred.reject('Error getting role');
     }
-  });
+  );
   return deferred.promise;
 }
 
@@ -246,17 +272,47 @@ function verifyRole(deviceRole, role) {
  */
 function sendCommand(deviceName, command, args) {
   var deferred = q.defer();
+  console.log('sending command:',command);
   knownDevices[deviceName].callFunction(command, args, function(err, data) {
     if(err) {
-      console.log('Command failure');
+      console.log('Command failure',data);
       deferred.reject('Command failure');
     } else {
-      console.log('Command success');
+      console.log('Command success',data);
       deferred.resolve('Command success');
     }
   });
   return deferred.promise;
 }
+
+/**
+ * getVariable
+ * Similar to the sendCommand function, this will return the value of a
+ *   variable on a given core
+ */
+function getVariable(deviceNmae, variable) {
+  var deferred = q.defer();
+  knownDevices[deviceNmae].getVariable(variable, function(err, data) {
+    if(err) {
+      console.log('Variable get failure',data);
+      deferred.reject('Command failure');
+    } else {
+      console.log('Variable get success',data);
+      deferred.resolve(data.result);
+    }
+  });
+  return deferred.promise;
+}
+
+// Login to spark cloud
+spark.login({accessToken: config.get('accessToken')}).then(
+  function(token) {
+    console.log('Login success');
+  },
+  function(error) {
+    console.log('Login failure');
+  }
+);
 
 // Do the initial retrival of devices and set a refresh every 100 seconds
 // This could probably be longer, you're not gonna be adding and removing

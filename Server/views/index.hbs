@@ -3,7 +3,9 @@
 <title>Control the ligths</title>
 </head>
 <body>
-  <h1>Control the lights!!!</h1>
-  {{links}}
+  <h1>Control your lights</h1>
+  {{#each devices}}
+    <div><a href="{{name}}">{{name}}</a></div>
+  {{/each}}
 </body>
 </html>
