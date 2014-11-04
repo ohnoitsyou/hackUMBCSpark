@@ -6,6 +6,7 @@ var express = require('express')
   , q = require('q')
   , config = require('config')
   , hbs = require('hbs')
+  , io = require('socket.io')(app)
   , knownDevices = {}
   ; 
 
@@ -55,7 +56,7 @@ app.get('/:device/off', function(req, res) {
       .then(function(role) {
         return verifyRole(role, 'lights');
       }).then(function() {
-        return sendCommand(device, 'setRoutine',0);
+        return sendCommand(device, 'ro',0);
       }).then(function(result) {
           console.log('Final result',result);
           res.send('Command Success');
@@ -80,7 +81,7 @@ app.get('/:device/silent', function(req, res) {
       .then(function(role) {
         return verifyRole(role, 'lights');
       }).then(function() {
-        return sendCommand(device, 'toggleSilent',0);
+        return sendCommand(device, 'ts',0);
       }).then(function(result) {
           console.log('Final result',result);
           res.send('Command Success');
@@ -106,7 +107,7 @@ app.get('/:device/r/:routine', function(req, res) {
       .then(function(role) {
         return verifyRole(role, 'lights');
       }).then(function() {
-        return sendCommand(device, 'setRoutine',routine);
+        return sendCommand(device, 'ro',routine);
       }).then(function(result) {
           console.log('Final result',result);
           res.send('Command Success');
@@ -133,7 +134,7 @@ app.get('/:device/cs/:speed', function(req, res) {
         return verifyRole(role, 'lights');
       }).then(function() {
         console.log(speed);
-        return sendCommand(device, 'setCS',speed);
+        return sendCommand(device, 'cs',speed);
       }).then(function(result) {
           console.log('Final result',result);
           res.send('Command Success');
@@ -160,7 +161,7 @@ app.get('/:device/ss/:speed', function(req, res) {
         return verifyRole(role, 'lights');
       }).then(function() {
         console.log(speed);
-        return sendCommand(device, 'setSSpeed',speed);
+        return sendCommand(device, 'ss',speed);
       }).then(function(result) {
           console.log('Final result',result);
           res.send('Command Success');
@@ -190,7 +191,7 @@ app.get('/:device/c/:r/:g/:b',function(req, res) {
       .then(function(role) {
         return verifyRole(role, 'lights');
       }).then(function() {
-        return sendCommand(device, 'setColor',rgbColor);
+        return sendCommand(device, 'co',rgbColor);
       }).then(function(result) {
           console.log('Final result',result);
           res.send('Command Success');
@@ -299,14 +300,14 @@ function verifyRole(deviceRole, role) {
  */
 function sendCommand(deviceName, command, args) {
   var deferred = q.defer();
-  console.log('sending command:',command);
-  knownDevices[deviceName].callFunction(command, args, function(err, data) {
+  console.log('Sending command',command);
+  knownDevices[deviceName].callFunction('setConfig', command + args, function(err, data) {
     if(err) {
-      console.log('Command failure',data);
-      deferred.reject('Command failure');
+      console.log('Command failure');
+      deferred.reject('Command failure',err);
     } else {
-      console.log('Command success',data);
-      deferred.resolve('Command success');
+      console.log('Command success');
+      deferred.resolve('Command success',data);
     }
   });
   return deferred.promise;
@@ -321,10 +322,10 @@ function getVariable(deviceNmae, variable) {
   var deferred = q.defer();
   knownDevices[deviceNmae].getVariable(variable, function(err, data) {
     if(err) {
-      console.log('Variable get failure',data);
+      console.log('Variable get failure');
       deferred.reject('Command failure');
     } else {
-      console.log('Variable get success',data);
+      console.log('Variable get success');
       deferred.resolve(data.result);
     }
   });
