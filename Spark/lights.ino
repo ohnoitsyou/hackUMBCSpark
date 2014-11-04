@@ -15,7 +15,8 @@ Color orange  (000, 190, 255);
 Color white   (255, 255, 255);
 Color black   (000, 000, 000);
 
-Color colorsArray[7] = {red, yellow, green, cyan, blue, magenta,red};
+int const numColors = 7;
+Color colorsArray[numColors] = {black,red, yellow, green, cyan, blue, magenta, black};
 
 Color lastColor(0,0,0);
 
@@ -25,6 +26,12 @@ int bluPin = A5;
 
 int colorPins[3] = {redPin, grnPin, bluPin};
 int cycleSpeed = 500;
+int stepSpeed  = 10;
+
+Fader fader = Fader();
+bool nextFade = true;
+int stepCounter = 0;
+int fadeCounter = -1;
 
 char *role = "lights";
 char *routines[4] = {"off", "random", "fade", "static"};
@@ -39,6 +46,8 @@ void setColor(Color color) {
     lastColor = color;
 }
 
+// I really should do this as a fixed width number.
+// I didn't want to mess with it on the node end though.
 int colorFromWeb(String args) {
     RGB.control(true);
     RGB.color(255,000,000);
@@ -46,7 +55,7 @@ int colorFromWeb(String args) {
     // find the seperators
     int redSep = args.indexOf(':');
     int grnSep = args.indexOf(':', redSep + 1);
-
+    
     unsigned int redValue = args.substring(0,redSep).toInt();
     unsigned int grnValue = args.substring(redSep + 1, grnSep).toInt();
     unsigned int bluValue = args.substring(grnSep + 1).toInt();
@@ -63,7 +72,7 @@ int setRoutine(String args) {
     RGB.control(true);
     RGB.color(255,0,0);
     routine = args.toInt();
-    EEPROM.write(1,routine);
+    EEPROM.write(1, routine);
     delay(50);
     RGB.control(false);
     return routine;
@@ -71,28 +80,78 @@ int setRoutine(String args) {
 
 int toggleSilent(String args) {
     silent = silent ? false : true;
-    EEPROM.write(2,silent);
+    EEPROM.write(2, silent);
     return (int) silent;
+}
+
+int setCycleSpeed(String args) {
+    RGB.control(true);
+    RGB.color(255,0,0);
+    cycleSpeed = args.toInt();
+    EEPROM.write(3, cycleSpeed);
+    RGB.control(false);
+    return cycleSpeed;
+}
+
+int setStepSpeed(String args) {
+    RGB.control(true);
+    RGB.color(255,0,0);
+    stepSpeed = args.toInt();
+    EEPROM.write(5, stepSpeed);
+    RGB.control(false);
+    return stepSpeed;
+}
+
+int setConfig(String args) {
+    RGB.control(true);
+    RGB.color(255,0,0);
+    int ret = 0;
+    String command = args.substring(0,2);
+    String cmdargs = args.substring(2);
+    if(command == "ro") {
+        ret = setRoutine(cmdargs);
+    } else if(command == "co") {
+        ret = colorFromWeb(cmdargs);
+    } else if(command == "cs") {
+        ret = setCycleSpeed(cmdargs);
+    } else if(command == "ss") {
+        ret = setStepSpeed(cmdargs);
+    } else if(command == "ts") {
+        ret = toggleSilent(cmdargs);
+    } else {
+        ret = -1;
+    }
+    RGB.control(false);
+    return ret;
 }
 
 void setup() {
     routine = (int) EEPROM.read(1);
     silent = (int) EEPROM.read(2);
-    Spark.function("setColor", colorFromWeb);
-    Spark.function("setRoutine", setRoutine);
-    Spark.function("toggleSilent", toggleSilent);
-
+    //cycleSpeed = (int) EEPROM.read(3) + (int) EEPROM.read(4);
+    
+    stepSpeed = (int) EEPROM.read(5);
+    
+    Spark.function("setConfig",setConfig);
+    //Spark.function("setColor", colorFromWeb);
+    //Spark.function("setRoutine", setRoutine);
+    //Spark.function("toggleSilent", toggleSilent);
+    //Spark.function("setCS", setCycleSpeed);
+    // Spark limits us to 4 functions, not sure why...
+    //Spark.function("setSSpeed", setStepSpeed);
+    
     Spark.variable("role", role, STRING);
+    
     int r = lastColor.getR();
     int g = lastColor.getG();
     int b = lastColor.getB();
     Spark.variable("redValue", &r, INT);
     Spark.variable("grnValue", &g, INT);
     Spark.variable("bluValue", &b, INT);
-
+  
     for(int i; i < 3; i++) {
-        pinMode(colorPins[i], OUTPUT);
         analogWrite(colorPins[i], 255);
+        pinMode(colorPins[i], OUTPUT);
     }
 }
 
@@ -113,15 +172,29 @@ void loop() {
         delay(cycleSpeed);
         break;
       case 2:
-        for(int i = 0; i < 7 - 1 ; i++) {
-            Fader fader = Fader(colorsArray[i], colorsArray[i+1]);
-            for(int i = 0; i < 256; i++) {
-                setColor(fader.getStep(i));
-                delay(10);
+        // Setup the initial fade. Everything else will be handled later
+        // If we change routine mid fade, we will pickup where we left off
+        //   this is an interesting side-effect of this method
+        // I could have setRoutine reset these values
+        if(fadeCounter == -1 || nextFade) {
+            fadeCounter++;
+            stepCounter = 0;
+            nextFade = false;
+            fader = Fader(colorsArray[fadeCounter], colorsArray[fadeCounter + 1]);
+        }
+        if(fadeCounter < numColors - 1 ) {
+            // display the current step
+            if(stepCounter < 256) {
+                setColor(fader.getStep(stepCounter));
+                stepCounter++;
+                delay(stepSpeed);
             }
-            // I really want this to be a s non-blocking as possible,
-            // so check if a new command has come in while we were fading
-            if(routine != 2) { break; }
+            // we hit the last step, go to the next fade
+            if(stepCounter >= 256) {
+                nextFade = true;
+            }
+        } else {
+            fadeCounter = -1;
         }
         break;
       case 3:
