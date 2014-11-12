@@ -1,6 +1,46 @@
 <htm>
 <head>
   <title>Device</title>
+  <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+  <script src="//code.jquery.com/jquery-2.1.1.min.js"></script>
+  <script src="//code.jquery.com/ui/1.11.2/jquery-ui.js"></script>
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.11.2/themes/smoothness/jquery-ui.css">
+
+  <script>
+    $(function() {
+      $("#redSlider, #grnSlider, #bluSlider").slider({
+        orientation: "horizontal",
+        range: "min",
+        max: 255,
+        change: function() {}
+      });
+    });
+    var socket = io.connect('lights.ohnoitsyou.net');
+    socket.on('connected', function() {socket.emit('getColors',{})});
+    socket.on('setColors', function(data) {
+      console.log(data);
+      updateSlider(data.color.r, data.color.g, data.color.b);
+    });
+    function updateSlider(r, g, b) {
+      $("#redSlider").slider("value", r);
+      $("#grnSlider").slider("value", g);
+      $("#bluSlider").slider("value", b);
+    }
+  </script>
+  <style>
+    #redSlider, #grnSlider, #bluSlider {
+      float: left;
+      clear: left;
+      width: 300px;
+      margin: 15px;
+    }
+    #redSlider .ui-slider-range { background: #ef2929; }
+    #redSlider .ui-slider-handle { border-color: #ef2929; }
+    #grnSlider .ui-slider-range { background: #8ae234; }
+    #grnSlider .ui-slider-handle { border-color: #8ae234; }
+    #bluSlider .ui-slider-range { background: #729fcf; }
+    #bluSlider .ui-slider-handle { border-color: #729fcf; }
+  </style>
 </head>
 <body>
   <h2>Device Status</h2>
@@ -10,6 +50,15 @@
   <div>ID: {{device.id}}</div>
   <div>Name: {{device.name}}</div>
   <div>Last Heard: {{device.lastHeard}}</div>
+  <div width="80%">
+    <table>
+    <form>
+      <tr><td><label for="redSlider">Red:</label></td><td><div id="redSlider"></div></td></tr>
+      <tr><td><label for="grnSlider">Green:</label></td><td><div id="grnSlider"></div></td></tr>
+      <tr><td><label for="bluSlider">Blue:</label></td><td><div id="bluSlider"></div></td></tr>
+    </form>
+    </table>
+  </div>
   {{else}}
   <div>You have requested a device that is either offline or I don't know about</div>
   {{/if}}
