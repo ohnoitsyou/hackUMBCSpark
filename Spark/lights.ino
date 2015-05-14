@@ -16,7 +16,7 @@ Color white   (255, 255, 255);
 Color black   (000, 000, 000);
 
 int const numColors = 7;
-Color colorsArray[numColors] = {black,red, yellow, green, cyan, blue, magenta, black};
+Color colorsArray[numColors] = {red, yellow, green, cyan, blue, magenta,red};
 
 Color lastColor(0,0,0);
 
@@ -37,12 +37,19 @@ char *role = "lights";
 char *routines[4] = {"off", "random", "fade", "static"};
 int routine = 0;
 
+int r = 0;
+int g = 0;
+int b = 0;
+
 bool silent;
 
 void setColor(Color color) {
     analogWrite(redPin,color.getR());
     analogWrite(grnPin,color.getG());
     analogWrite(bluPin,color.getB());
+    r = color.getR();
+    g = color.getG();
+    b = color.getB();
     lastColor = color;
 }
 
@@ -51,7 +58,6 @@ void setColor(Color color) {
 int colorFromWeb(String args) {
     RGB.control(true);
     RGB.color(255,000,000);
-    delay(50);
     // find the seperators
     int redSep = args.indexOf(':');
     int grnSep = args.indexOf(':', redSep + 1);
@@ -108,15 +114,15 @@ int setConfig(String args) {
     int ret = 0;
     String command = args.substring(0,2);
     String cmdargs = args.substring(2);
-    if(command == "ro") {
+    if(command == "ro") { // routine
         ret = setRoutine(cmdargs);
-    } else if(command == "co") {
+    } else if(command == "co") { // color
         ret = colorFromWeb(cmdargs);
-    } else if(command == "cs") {
+    } else if(command == "cs") { // cycle speed
         ret = setCycleSpeed(cmdargs);
-    } else if(command == "ss") {
+    } else if(command == "ss") { // step speed
         ret = setStepSpeed(cmdargs);
-    } else if(command == "ts") {
+    } else if(command == "ts") { // toggle silent
         ret = toggleSilent(cmdargs);
     } else {
         ret = -1;
@@ -126,25 +132,17 @@ int setConfig(String args) {
 }
 
 void setup() {
+    Serial.begin(9600);
     routine = (int) EEPROM.read(1);
     silent = (int) EEPROM.read(2);
     //cycleSpeed = (int) EEPROM.read(3) + (int) EEPROM.read(4);
     
-    stepSpeed = (int) EEPROM.read(5);
+    //stepSpeed = (int) EEPROM.read(5);
     
     Spark.function("setConfig",setConfig);
-    //Spark.function("setColor", colorFromWeb);
-    //Spark.function("setRoutine", setRoutine);
-    //Spark.function("toggleSilent", toggleSilent);
-    //Spark.function("setCS", setCycleSpeed);
-    // Spark limits us to 4 functions, not sure why...
-    //Spark.function("setSSpeed", setStepSpeed);
-    
+
     Spark.variable("role", role, STRING);
-    
-    int r = lastColor.getR();
-    int g = lastColor.getG();
-    int b = lastColor.getB();
+    Spark.variable("routine", &routine, INT);
     Spark.variable("redValue", &r, INT);
     Spark.variable("grnValue", &g, INT);
     Spark.variable("bluValue", &b, INT);
